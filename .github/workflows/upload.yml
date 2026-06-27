@@ -17,10 +17,10 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install requests requests-toolbelt tqdm gdown
+          pip install requests requests-toolbelt tqdm
 
-      - name: Upload files
+      - name: Run uploader
         env:
           PW_TOKEN: ${{ secrets.PW_TOKEN }}
-        run: |
-          python upload_from_gdrive.py
+          GDRIVE_API_KEY: ${{ secrets.GDRIVE_API_KEY }}
+        run: python upload_from_gdrive.py

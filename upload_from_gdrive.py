@@ -74,10 +74,7 @@ def main():
     print("Downloading Google Drive folder...")
     gdown.download_folder(
         url=FOLDER_URL,
-        output=temp_dir,
-        quiet=False,
-        use_cookies=False,
-        remaining_ok=True,
+        output=temp_dir
     )
 
     files = []

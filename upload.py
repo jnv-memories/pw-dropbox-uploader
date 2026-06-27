@@ -1,53 +1,28 @@
-import os
 import json
+import os
+import shutil
 import tempfile
-import requests
 
-from tqdm import tqdm
+import gdown
+import requests
 from requests_toolbelt.multipart.encoder import (
     MultipartEncoder,
-    MultipartEncoderMonitor
+    MultipartEncoderMonitor,
 )
+from tqdm import tqdm
 
 TOKEN = os.environ["PW_TOKEN"]
 
-DROPBOX_URL = os.environ["DROPBOX_URL"]
+FOLDER_URL = "https://drive.google.com/drive/folders/1SSIz5CwXskmCAEe3wU9UzZQfB2UgrH6y"
 
 UPLOAD_URL = "https://api.penpencil.co/v1/files"
 
-headers = {
+HEADERS = {
     "authorization": f"Bearer {TOKEN}"
 }
 
 
-def download_file():
-
-    print("Downloading from Dropbox...")
-
-    r = requests.get(DROPBOX_URL, stream=True)
-    r.raise_for_status()
-
-    total = int(r.headers.get("content-length", 0))
-
-    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".zip")
-
-    with open(tmp.name, "wb") as f, tqdm(
-        total=total,
-        unit="B",
-        unit_scale=True,
-        desc="Download",
-    ) as bar:
-
-        for chunk in r.iter_content(1024 * 1024):
-            if chunk:
-                f.write(chunk)
-                bar.update(len(chunk))
-
-    return tmp.name
-
-
 def upload(path):
-
     filename = os.path.basename(path)
 
     encoder = MultipartEncoder(
@@ -64,7 +39,7 @@ def upload(path):
         total=encoder.len,
         unit="B",
         unit_scale=True,
-        desc="Upload",
+        desc=f"Uploading {filename}",
     )
 
     def callback(monitor):
@@ -75,6 +50,7 @@ def upload(path):
         callback,
     )
 
+    headers = HEADERS.copy()
     headers["Content-Type"] = monitor.content_type
 
     response = requests.post(
@@ -87,20 +63,39 @@ def upload(path):
 
     response.raise_for_status()
 
-    result = response.json()
-
-    print(json.dumps(result, indent=4))
+    print(f"\n=== Uploaded {filename} ===")
+    print(json.dumps(response.json(), indent=4))
 
 
 def main():
 
-    file = download_file()
+    temp_dir = tempfile.mkdtemp()
 
-    try:
-        upload(file)
+    print("Downloading Google Drive folder...")
+    gdown.download_folder(
+        url=FOLDER_URL,
+        output=temp_dir,
+        quiet=False,
+        use_cookies=False,
+        remaining_ok=True,
+    )
 
-    finally:
-        os.remove(file)
+    files = []
+
+    for root, _, filenames in os.walk(temp_dir):
+        for f in filenames:
+            files.append(os.path.join(root, f))
+
+    print(f"\nFound {len(files)} files.\n")
+
+    for path in files:
+        try:
+            upload(path)
+        except Exception as e:
+            print(f"Failed: {path}")
+            print(e)
+
+    shutil.rmtree(temp_dir)
 
 
 if __name__ == "__main__":

@@ -12,7 +12,7 @@ from requests_toolbelt.multipart.encoder import (
 PW_TOKEN = os.environ["PW_TOKEN"]
 GDRIVE_API_KEY = os.environ["GDRIVE_API_KEY"]
 
-FOLDER_ID = "1g8cCGXbwZmj4wSHqKv8GWVK6Rd6H1eoj"
+FOLDER_ID = "1csUkT15QFnIWxT5Ys03QhXX-_hSHBhIo"
 
 UPLOAD_URL = "https://api.penpencil.co/v1/files"
 

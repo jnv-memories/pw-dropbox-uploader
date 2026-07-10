@@ -73,13 +73,13 @@ jobs:
 
             echo "Using Google Drive source..."
 
-            python uploader/upload_from_gdrive.py
+            python upload_from_gdrive.py
 
           elif [ "$DOWNLOAD_SOURCE" = "url" ]; then
 
             echo "Using Direct URL source..."
 
-            python uploader/upload_from_url.py
+            python upload_from_url.py
 
           else
 

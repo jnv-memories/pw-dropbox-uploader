@@ -17,10 +17,16 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install requests requests-toolbelt tqdm
+          pip install -r uploader/requirements.txt
+
+      - name: Create Firebase Credentials
+        run: |
+          echo '${{ secrets.FIREBASE_JSON }}' > uploader/firebase.json
 
       - name: Run uploader
+        working-directory: uploader
         env:
           PW_TOKEN: ${{ secrets.PW_TOKEN }}
           GDRIVE_API_KEY: ${{ secrets.GDRIVE_API_KEY }}
-        run: python upload_from_gdrive.py
+        run: |
+          python upload_from_gdrive.py

@@ -1,0 +1,5 @@
+firebase-admin
+google-api-python-client
+requests
+requests-toolbelt
+tqdm

@@ -1,18 +1,26 @@
-name: Upload Google Drive Folder
+name: Upload Files
 
 on:
   workflow_dispatch:
 
+  schedule:
+    - cron: "*/30 * * * *"
+
 jobs:
+
   upload:
+
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.11"
 
       - name: Install dependencies
         run: |
@@ -20,15 +28,64 @@ jobs:
           pip install -r uploader/requirements.txt
 
       - name: Create Firebase Credentials
+        env:
+          FIREBASE_JSON: ${{ secrets.FIREBASE_JSON }}
         run: |
-          cat > uploader/firebase.json << 'EOF'
-          ${{ secrets.FIREBASE_JSON }}
-          EOF
+          echo "$FIREBASE_JSON" > uploader/firebase.json
+
+      ######################################################
+      # CHANGE THESE VALUES WHEN NEEDED
+      ######################################################
 
       - name: Run uploader
-        working-directory: uploader
+
         env:
+
           PW_TOKEN: ${{ secrets.PW_TOKEN }}
+
           GDRIVE_API_KEY: ${{ secrets.GDRIVE_API_KEY }}
+
+          #
+          # Choose source
+          #
+          # drive
+          # url
+          #
+
+          DOWNLOAD_SOURCE: drive
+
+          #
+          # Single URL (optional)
+          #
+
+          DIRECT_URL:
+
+          #
+          # Multiple URLs (optional)
+          #
+
+          DIRECT_URLS: |
+            # https://example.com/file1.mp4
+            # https://example.com/file2.mkv
+
         run: |
-          python upload_from_gdrive.py
+
+          if [ "$DOWNLOAD_SOURCE" = "drive" ]; then
+
+            echo "Using Google Drive source..."
+
+            python uploader/upload_from_gdrive.py
+
+          elif [ "$DOWNLOAD_SOURCE" = "url" ]; then
+
+            echo "Using Direct URL source..."
+
+            python uploader/upload_from_url.py
+
+          else
+
+            echo "Unknown DOWNLOAD_SOURCE: $DOWNLOAD_SOURCE"
+
+            exit 1
+
+          fi

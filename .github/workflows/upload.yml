@@ -63,7 +63,7 @@ jobs:
           # Multiple URLs (optional)
           #
 
-          DIRECT_URLS: |
+         # DIRECT_URLS: |
             # https://example.com/file1.mp4
             # https://example.com/file2.mkv
 

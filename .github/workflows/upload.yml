@@ -36,6 +36,7 @@ jobs:
       ######################################################
 
       - name: Run uploader
+        working-directory: uploader
 
         env:
 

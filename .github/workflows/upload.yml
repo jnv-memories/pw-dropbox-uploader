@@ -21,7 +21,9 @@ jobs:
 
       - name: Create Firebase Credentials
         run: |
-          echo '${{ secrets.FIREBASE_JSON }}' > uploader/firebase.json
+          cat > uploader/firebase.json << 'EOF'
+          ${{ secrets.FIREBASE_JSON }}
+          EOF
 
       - name: Run uploader
         working-directory: uploader

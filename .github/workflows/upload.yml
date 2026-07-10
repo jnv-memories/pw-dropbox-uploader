@@ -3,8 +3,6 @@ name: Upload Files
 on:
   workflow_dispatch:
 
-  schedule:
-    - cron: "*/30 * * * *"
 
 jobs:
 
@@ -28,10 +26,10 @@ jobs:
           pip install -r uploader/requirements.txt
 
       - name: Create Firebase Credentials
-        env:
-          FIREBASE_JSON: ${{ secrets.FIREBASE_JSON }}
         run: |
-          echo "$FIREBASE_JSON" > uploader/firebase.json
+          cat > uploader/firebase.json << 'EOF'
+          ${{ secrets.FIREBASE_JSON }}
+          EOF
 
       ######################################################
       # CHANGE THESE VALUES WHEN NEEDED
@@ -52,13 +50,13 @@ jobs:
           # url
           #
 
-          DOWNLOAD_SOURCE: drive
+          DOWNLOAD_SOURCE: url
 
           #
           # Single URL (optional)
           #
 
-          DIRECT_URL:
+          DIRECT_URL: "https://sr.animeheaven.me/video.mp4?32cf66b07cf9089310b2924b66984b1e&fe6656d05616812838cf73d089627df4"
 
           #
           # Multiple URLs (optional)

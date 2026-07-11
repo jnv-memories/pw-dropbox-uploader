@@ -147,9 +147,7 @@ def get_pending_jobs():
             "==",
             "pending"
         )
-        .order_by(
-            "createdAt"
-        )
+        
         .stream()
     )
 

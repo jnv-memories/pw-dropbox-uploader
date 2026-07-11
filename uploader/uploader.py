@@ -30,7 +30,7 @@ from session_manager import (
 )
 
 # Firestore folder document id
-FOLDER_ID = "NWCQ2SOM1yZiice05vTN"
+#FOLDER_ID = "NWCQ2SOM1yZiice05vTN"
 
 def get_file_type(file_name):
     return (
@@ -128,7 +128,7 @@ def upload_single_part(
 
 
 
-def upload_file(file_path):
+def upload_file(file_path,FOLDER_ID):
 
     file_size=os.path.getsize(file_path)
 

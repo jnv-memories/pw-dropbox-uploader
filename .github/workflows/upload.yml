@@ -53,24 +53,7 @@ jobs:
 
           DOWNLOAD_SOURCE: url
 
-          #
-          # Single URL (optional)
-          #
-
-          DIRECT_URLS: |
-           https://ct.animeheaven.me/video.mp4?11722945b16c4a8b9627e2d902e7a018&d
-           https://cu.animeheaven.me/video.mp4?116aadc7db858aef15594b99a94e9505&d
-           https://ct.animeheaven.me/video.mp4?4a7d3952fbf3aa20863628efec8ae491&d
-           https://ax.animeheaven.me/video.mp4?3c721af98a7d8fe44e0560581f4d8c9c&d
-           https://rk.animeheaven.me/video.mp4?dd4d7c92f4d9b5f0ef09ec6e1cc471d2&d
-
-          #
-          # Multiple URLs (optional)
-          #
-
-         # DIRECT_URLS: |
-            # https://example.com/file1.mp4
-            # https://example.com/file2.mkv
+          
 
         run: |
 

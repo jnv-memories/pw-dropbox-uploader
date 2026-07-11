@@ -1,5 +1,6 @@
 import os
 import json
+import mimetypes
 import time
 import requests
 
@@ -28,6 +29,16 @@ from session_manager import (
     uploaded_bytes
 )
 
+# Firestore folder document id
+FOLDER_ID = "NWCQ2SOM1yZiice05vTN"
+
+def get_file_type(file_name):
+    return (
+        mimetypes.guess_type(file_name)[0]
+        or
+        "application/octet-stream"
+    )
+
 
 def upload_single_part(
     path,
@@ -43,7 +54,7 @@ def upload_single_part(
                 "image":(
                     upload_name,
                     fp,
-                    "application/octet-stream"
+                    mimetypes.guess_type(upload_name)[0] or "application/octet-stream"
                 )
             }
 
@@ -207,6 +218,7 @@ def upload_file(file_path):
             "_id":result["_id"],
 
             "multipart":False,
+            "folderId":FOLDER_ID,
 
             "name":file_name,
 
@@ -216,7 +228,7 @@ def upload_file(file_path):
 
             "size":file_size,
 
-            "type":"application/octet-stream"
+            "type":get_file_type(file_name)
 
         })
 
@@ -370,12 +382,13 @@ def upload_file(file_path):
         "id":"virtual-"+session["sessionId"],
 
         "multipart":True,
+        "folderId":FOLDER_ID,
 
         "name":file_name,
 
         "size":file_size,
 
-        "type":"application/octet-stream",
+        "type":get_file_type(file_name),
 
         "createdAt":session["createdAt"],
 

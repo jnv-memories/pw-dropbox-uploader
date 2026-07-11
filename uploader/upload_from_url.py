@@ -4,7 +4,7 @@ import traceback
 from direct_download import download_from_url
 from uploader import upload_file
 
-from uploader.firebase_db import (
+from firebase_db import (
     get_pending_jobs,
     update_download_job
 )

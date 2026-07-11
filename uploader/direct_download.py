@@ -1,25 +1,34 @@
 import os
 import tempfile
 import requests
+import re
+from urllib.parse import unquote
 
 from tqdm import tqdm
 
 
 def _filename_from_response(response, url):
+    cd = response.headers.get("content-disposition", "")
 
-    cd = response.headers.get("content-disposition")
+    if cd:
+        # RFC 5987: filename*=UTF-8''...
+        m = re.search(r"filename\*\s*=\s*([^']*)''([^;]+)", cd, re.I)
+        if m:
+            return unquote(m.group(2))
 
-    if cd and "filename=" in cd:
-        name = cd.split("filename=")[-1].strip("\"'")
-        if name:
-            return name
+        # Normal filename="..."
+        m = re.search(r'filename\s*=\s*"([^"]+)"', cd, re.I)
+        if m:
+            return m.group(1)
 
-    name = url.split("?")[0].split("/")[-1]
+        # filename=...
+        m = re.search(r'filename\s*=\s*([^;]+)', cd, re.I)
+        if m:
+            return m.group(1).strip("\"' ")
 
-    if name:
-        return name
-
-    return "download.bin"
+    # Fallback to URL
+    name = os.path.basename(url.split("?", 1)[0])
+    return name or "download.bin"
 
 
 def download_from_url(

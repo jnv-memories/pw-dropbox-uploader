@@ -61,7 +61,7 @@ def main():
 
             upload_file(
                 temp_path,
-                folder_id=folder_id
+                folder_id
             )
 
             update_download_job(

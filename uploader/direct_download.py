@@ -4,7 +4,7 @@ import json
 import subprocess
 import tempfile
 from urllib.parse import unquote, urlparse, parse_qs
-from curl_cffi import requests  # Swapped standard requests for curl_cffi
+from curl_cffi import requests  # Swapped standard requests for curl_cffi to bypass TLS blocks
 from tqdm import tqdm
 
 def _filename_from_response(response, url):
@@ -36,7 +36,7 @@ def download_hls_stream(url, download_path, headers=None):
         "-probesize", "30000000",
         "-i", url,
         "-c:v", "copy",            # Copy video exactly (no quality loss, fast)
-        "-c:a", "aac",             # Re-encode the audio to fix the missing header data
+        "-c:a", "aac",             # Re-encode the audio to fix missing header details
         "-ar", "44100",            # Force standard 44.1kHz audio sample rate fallback
         "-ac", "2",                # Force standard 2-channel stereo audio setup
         "-bsf:a", "aac_adtstoasc",
@@ -46,6 +46,7 @@ def download_hls_stream(url, download_path, headers=None):
     process = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     if process.returncode != 0:
         raise RuntimeError(f"FFmpeg failed to download stream. Error:\n{process.stderr}")
+
 def extract_nested_headers(url_string):
     current_url = url_string
     
@@ -108,13 +109,21 @@ def download_from_url(url, filename=None, headers=None):
     except Exception as e:
         print(f"\n[!] Warning: Nested header extraction failed: {e}")
 
+    # 1. Check if the URL is an HLS/m3u8 stream
     if ".m3u8" in url.lower() or "manifest" in url.lower():
         if filename is None:
             clean_url = url.split("?", 1)[0]
-            base_name = os.path.basename(clean_url).replace(".m3u8", "")
+            base_name = os.path.basename(clean_url)
+            # FORCE REMOVAL OF BOTH .m3u8 AND .mkv SUFFIXES TO AVOID REDUNDANT EXTENSIONS
+            base_name = base_name.replace(".m3u8", "").replace(".mkv", "")
             filename = f"{base_name or 'video'}.mp4"
             
         download_path = os.path.join(tempfile.gettempdir(), filename)
+        
+        # Ensure the filename ends in .mp4 even if passed explicitly as an argument
+        if not download_path.lower().endswith('.mp4'):
+            base, _ = os.path.splitext(download_path)
+            download_path = f"{base}.mp4"
         
         base, ext = os.path.splitext(download_path)
         counter = 1
@@ -122,26 +131,28 @@ def download_from_url(url, filename=None, headers=None):
             download_path = f"{base} ({counter}){ext}"
             counter += 1
             
-        download_hls_stream(url, download_path)
+        download_hls_stream(url, download_path, headers)
         return download_path
 
     print(f"\nSending request to stream proxy URL: {url}")
     
-    # Using curl_cffi to impersonate a real Chrome browser's TLS signature
     response = requests.get(
         url,
         headers=headers,
         stream=True,
         allow_redirects=True,
         timeout=None,
-        impersonate="chrome120"  # This is the magic key for WAF bypass
+        impersonate="chrome120"
     )
     response.raise_for_status()
     
     if filename is None:
         filename = _filename_from_response(response, response.url)
+        filename = filename.replace(".mkv", "") # Strip .mkv out if found in header names
         if len(filename) > 100 or "video" in filename.lower():
-            filename = "streamed_video.mp4"
+            filename = "streamed_video"
+        if not filename.lower().endswith(".mp4"):
+            filename = f"{filename}.mp4"
         
     download_path = os.path.join(tempfile.gettempdir(), filename)
     base, ext = os.path.splitext(download_path)
@@ -157,7 +168,6 @@ def download_from_url(url, filename=None, headers=None):
         unit_scale=True,
         desc=f"Downloading {filename}"
     ) as bar:
-        # curl_cffi iter_content handles chunks seamlessly just like standard requests
         for chunk in response.iter_content(chunk_size=1024 * 1024):
             if chunk:
                 fp.write(chunk)

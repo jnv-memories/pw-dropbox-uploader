@@ -4,7 +4,7 @@ import json
 import subprocess
 import tempfile
 from urllib.parse import unquote, urlparse, parse_qs
-import requests
+from curl_cffi import requests  # Swapped standard requests for curl_cffi
 from tqdm import tqdm
 
 def _filename_from_response(response, url):
@@ -23,7 +23,6 @@ def _filename_from_response(response, url):
     return name or "download.bin"
 
 def download_hls_stream(url, download_path):
-    """Downloads an HLS stream (.m3u8) using system FFmpeg."""
     print(f"HLS stream detected. Downloading via FFmpeg to {download_path}...")
     
     cmd = [
@@ -40,7 +39,6 @@ def download_hls_stream(url, download_path):
         raise RuntimeError(f"FFmpeg failed to download stream. Error:\n{process.stderr}")
 
 def extract_nested_headers(url_string):
-    """Recursively searches for a 'headers' parameter inside a nested/encoded URL structure."""
     current_url = url_string
     
     for _ in range(4):
@@ -74,28 +72,24 @@ def extract_nested_headers(url_string):
 def download_from_url(url, filename=None, headers=None):
     headers = headers or {}
     
-    # Base browser emulation headers matching your exact fetch payload
+    # Synchronized headers to avoid detection (Matching Chrome 120 profile)
     browser_headers = {
-        "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36",
-        "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-        "accept-language": "en-IN,en-GB;q=0.9,en-US;q=0.8,en;q=0.7",
-        "priority": "u=0, i",
-        "sec-ch-ua": '"Not;A=Brand";v="8", "Chromium";v="150", "Google Chrome";v="150"',
-        "sec-ch-ua-mobile": "?1",
-        "sec-ch-ua-platform": '"Android"',
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+        "accept-language": "en-US,en;q=0.9",
+        "sec-ch-ua": '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": '"Windows"',
         "sec-fetch-dest": "document",
         "sec-fetch-mode": "navigate",
         "sec-fetch-site": "none",
-        "sec-fetch-user": "?1",
         "upgrade-insecure-requests": "1"
     }
     
-    # Merge browser defaults into our active headers if not overridden
     for key, value in browser_headers.items():
         if key not in headers:
             headers[key] = value
 
-    # Extract any deeply nested query headers (Origin/Referer) and merge them too
     try:
         extracted = extract_nested_headers(url)
         if extracted:
@@ -106,7 +100,6 @@ def download_from_url(url, filename=None, headers=None):
     except Exception as e:
         print(f"\n[!] Warning: Nested header extraction failed: {e}")
 
-    # 1. Check if the URL is an HLS/m3u8 stream
     if ".m3u8" in url.lower() or "manifest" in url.lower():
         if filename is None:
             clean_url = url.split("?", 1)[0]
@@ -124,22 +117,21 @@ def download_from_url(url, filename=None, headers=None):
         download_hls_stream(url, download_path)
         return download_path
 
-    # 2. Standard HTTP download logic using the original, un-stripped proxy URL
     print(f"\nSending request to stream proxy URL: {url}")
-    print(f"Headers sent: {headers}\n")
     
+    # Using curl_cffi to impersonate a real Chrome browser's TLS signature
     response = requests.get(
         url,
         headers=headers,
         stream=True,
         allow_redirects=True,
-        timeout=None
+        timeout=None,
+        impersonate="chrome120"  # This is the magic key for WAF bypass
     )
     response.raise_for_status()
     
     if filename is None:
         filename = _filename_from_response(response, response.url)
-        # Fallback if filename extraction produces the long stream string
         if len(filename) > 100 or "video" in filename.lower():
             filename = "streamed_video.mp4"
         
@@ -157,10 +149,10 @@ def download_from_url(url, filename=None, headers=None):
         unit_scale=True,
         desc=f"Downloading {filename}"
     ) as bar:
-        for chunk in response.iter_content(1024 * 1024):
-            if not chunk:
-                continue
-            fp.write(chunk)
-            bar.update(len(chunk))
+        # curl_cffi iter_content handles chunks seamlessly just like standard requests
+        for chunk in response.iter_content(chunk_size=1024 * 1024):
+            if chunk:
+                fp.write(chunk)
+                bar.update(len(chunk))
             
     return download_path

@@ -6,8 +6,9 @@ def get_queue():
     response = requests.get(url)
     data = json.loads(response.text)
     number = data["no_of_jobs"]
-    if number > 0 :
-        return True
-    else :
-        return False
+    if number > 0:
+        print("true")
+    else:
+        print("false")
+
 get_queue()

@@ -3,7 +3,7 @@ import re
 import json
 import subprocess
 import tempfile
-from urllib.parse import unquote
+from urllib.parse import unquote, urlparse, parse_qs
 import requests
 from tqdm import tqdm
 
@@ -39,6 +39,42 @@ def download_hls_stream(url, download_path):
     if process.returncode != 0:
         raise RuntimeError(f"FFmpeg failed to download stream. Error:\n{process.stderr}")
 
+def extract_nested_headers(url_string):
+    """Recursively searches for a 'headers' parameter inside a nested/encoded URL structure."""
+    current_url = url_string
+    
+    # Loop up to 4 times to unwrap nested parameters safely
+    for _ in range(4):
+        parsed = urlparse(current_url)
+        params = parse_qs(parsed.query)
+        
+        # 1. Direct match check
+        if 'headers' in params:
+            try:
+                header_data = json.loads(params['headers'][0])
+                if isinstance(header_data, dict):
+                    return header_data
+            except Exception:
+                pass
+                
+        # 2. Check if there's an inner URL parameter we need to dig into next
+        inner_url_key = next((k for k in params if k.lower() == 'url'), None)
+        if inner_url_key:
+            current_url = unquote(params[inner_url_key][0])
+        else:
+            # If there's no nested 'url' parameter left, try unquoting the entire query raw string
+            decoded_query = unquote(parsed.query)
+            if 'headers=' in decoded_query:
+                match = re.search(r'headers=(.*?)(?:&|$)', decoded_query)
+                if match:
+                    try:
+                        return json.loads(match.group(1))
+                    except Exception:
+                        pass
+            break
+            
+    return {}
+
 def download_from_url(url, filename=None, headers=None):
     headers = headers or {}
     
@@ -46,29 +82,18 @@ def download_from_url(url, filename=None, headers=None):
     if "User-Agent" not in headers:
         headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
 
-    # --- AGGRESSIVE MULTI-DECODE FOR EMBEDDED HEADERS ---
+    # --- RECURSIVE DECODE FOR EMBEDDED HEADERS ---
     try:
-        # Scan for the headers block using regex to avoid urlparse breaking on nested params
-        match = re.search(r'headers(?:=|(?:%3D))(\{.*\}|%7B.*%7D)', url, re.IGNORECASE)
-        if match:
-            raw_data = match.group(1)
-            
-            # Continuously unquote until it looks like pure JSON strings
-            for _ in range(3):
-                if "%" in raw_data:
-                    raw_data = unquote(raw_data)
-                else:
-                    break
-            
-            # Parse the extracted JSON string
-            extracted_headers = json.loads(raw_data)
-            if isinstance(extracted_headers, dict):
-                print("\n[✔] Successfully extracted authentication headers from URL:")
-                for k, v in extracted_headers.items():
-                    print(f"    -> {k}: {v}")
-                    headers[k] = v
+        extracted = extract_nested_headers(url)
+        if extracted:
+            print("\n[✔] Successfully extracted authentication headers from nested URL:")
+            for k, v in extracted.items():
+                print(f"    -> {k}: {v}")
+                headers[k] = v
+        else:
+            print("\n[!] No embedded headers object detected in the URL parameters.")
     except Exception as e:
-        print(f"\n[!] Warning: Regex extraction of embedded headers failed: {e}")
+        print(f"\n[!] Warning: Nested header extraction failed: {e}")
     # --------------------------------------------------
 
     # 1. Check if the URL is an HLS/m3u8 stream

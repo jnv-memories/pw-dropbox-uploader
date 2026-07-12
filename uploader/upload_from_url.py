@@ -1,5 +1,7 @@
 import os
 import traceback
+import requests
+import json
 
 from direct_download import download_from_url
 from uploader import upload_file
@@ -8,7 +10,6 @@ from firebase_db import (
     get_pending_jobs,
     update_download_job
 )
-
 
 def main():
 
@@ -92,7 +93,14 @@ def main():
     print("Finished.")
     print()
 
+def get_queue():
+    url  = "https://queue-server-wpes.onrender.com/"
+    response = requests.get(url)
+    data = json.loads(response.text)
+    number = data["no_of_jobs"]
+    if number>0:
+        main()
+
 
 if __name__ == "__main__":
-
-    main()
+    get_queue()

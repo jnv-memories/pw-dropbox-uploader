@@ -3,7 +3,7 @@ import re
 import json
 import subprocess
 import tempfile
-from urllib.parse import unquote, urlparse, parse_qs
+from urllib.parse import unquote
 import requests
 from tqdm import tqdm
 
@@ -40,31 +40,35 @@ def download_hls_stream(url, download_path):
         raise RuntimeError(f"FFmpeg failed to download stream. Error:\n{process.stderr}")
 
 def download_from_url(url, filename=None, headers=None):
-    # Initialize headers dictionary if not passed
     headers = headers or {}
     
-    # Add a standard browser User-Agent to prevent basic bot blocking
+    # Standard modern browser User-Agent
     if "User-Agent" not in headers:
-        headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
 
-    # --- AUTO-EXTRACT EMBEDDED HEADERS FROM THE URL ---
+    # --- AGGRESSIVE MULTI-DECODE FOR EMBEDDED HEADERS ---
     try:
-        parsed_url = urlparse(url)
-        query_params = parse_qs(parsed_url.query)
-        
-        # Check if the URL contains a 'headers' query parameter
-        if 'headers' in query_params:
-            raw_headers_str = query_params['headers'][0]
-            # Decode the JSON string embedded inside the URL parameter
-            extracted_headers = json.loads(raw_headers_str)
+        # Scan for the headers block using regex to avoid urlparse breaking on nested params
+        match = re.search(r'headers(?:=|(?:%3D))(\{.*\}|%7B.*%7D)', url, re.IGNORECASE)
+        if match:
+            raw_data = match.group(1)
             
+            # Continuously unquote until it looks like pure JSON strings
+            for _ in range(3):
+                if "%" in raw_data:
+                    raw_data = unquote(raw_data)
+                else:
+                    break
+            
+            # Parse the extracted JSON string
+            extracted_headers = json.loads(raw_data)
             if isinstance(extracted_headers, dict):
-                print("Extracted custom authentication headers from URL:")
+                print("\n[✔] Successfully extracted authentication headers from URL:")
                 for k, v in extracted_headers.items():
-                    print(f"  -> {k}: {v}")
-                    headers[k] = v  # Inject them (e.g., Origin, Referer)
+                    print(f"    -> {k}: {v}")
+                    headers[k] = v
     except Exception as e:
-        print(f"Warning: Failed to parse embedded headers from URL: {e}")
+        print(f"\n[!] Warning: Regex extraction of embedded headers failed: {e}")
     # --------------------------------------------------
 
     # 1. Check if the URL is an HLS/m3u8 stream
@@ -86,6 +90,7 @@ def download_from_url(url, filename=None, headers=None):
         return download_path
 
     # 2. Fallback to standard HTTP download logic for regular files
+    print(f"Sending request with headers: {headers}")
     response = requests.get(
         url,
         headers=headers,

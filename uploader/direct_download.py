@@ -22,22 +22,37 @@ def _filename_from_response(response, url):
     name = os.path.basename(url.split("?", 1)[0])
     return name or "download.bin"
 
-def download_hls_stream(url, download_path):
+def download_hls_stream(url, download_path, headers=None):
     print(f"HLS stream detected. Downloading via FFmpeg to {download_path}...")
     
-    cmd = [
-        "ffmpeg",
-        "-y",
-        "-i", url,
+    # 1. Start building the command
+    cmd = ["ffmpeg", "-y"]
+    
+    # 2. Add browser headers if they exist
+    if headers:
+        header_str = "".join([f"{k}: {v}\r\n" for k, v in headers.items()])
+        cmd.extend(["-headers", header_str])
+        
+    # 3. ADVANCED STREAM PROBING OPTIONS (Must come BEFORE '-i')
+    # This forces FFmpeg to look deeper into the stream to find audio properties
+    cmd.extend([
+        "-analyzeduration", "20000000",  # Analyze up to 20 seconds of video data
+        "-probesize", "20000000",        # Look at up to 20MB of stream data
+    ])
+    
+    # 4. Add the input URL
+    cmd.extend(["-i", url])
+    
+    # 5. Output mapping and copying settings
+    cmd.extend([
         "-c", "copy",
         "-bsf:a", "aac_adtstoasc",
         download_path
-    ]
+    ])
     
     process = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     if process.returncode != 0:
         raise RuntimeError(f"FFmpeg failed to download stream. Error:\n{process.stderr}")
-
 def extract_nested_headers(url_string):
     current_url = url_string
     

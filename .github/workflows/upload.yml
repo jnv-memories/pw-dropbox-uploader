@@ -5,15 +5,10 @@ on:
   schedule:
     - cron: "*/5 * * * *"
 
-
 jobs:
-
   upload:
-
     runs-on: ubuntu-latest
-
     steps:
-
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -21,67 +16,61 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+
+      # 1. Install ONLY the requirement needed to check jobs
+      - name: Install requests
+        run: pip install requests
+
+      # 2. Check for jobs BEFORE heavy installations
+      - name: Check for jobs
+        id: check_jobs
+        working-directory: uploader
+        run: |
+          RESULT=$(python jobs.py)
+          if [ "$RESULT" = "true" ]; then
+            echo "Jobs found. Proceeding with workflow..."
+            echo "has_jobs=true" >> $GITHUB_OUTPUT
+          else
+            echo "No jobs in queue. Halting execution gracefully."
+            echo "has_jobs=false" >> $GITHUB_OUTPUT
+          fi
+
+      # 3. All subsequent steps now check if 'has_jobs' is true
       - name: Install FFmpeg
+        if: steps.check_jobs.outputs.has_jobs == 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg
 
       - name: Install dependencies
+        if: steps.check_jobs.outputs.has_jobs == 'true'
         run: |
           python -m pip install --upgrade pip
           pip install -r uploader/requirements.txt
 
       - name: Create Firebase Credentials
+        if: steps.check_jobs.outputs.has_jobs == 'true'
         run: |
           cat > uploader/firebase.json << 'EOF'
           ${{ secrets.FIREBASE_JSON }}
           EOF
 
-      ######################################################
-      # CHANGE THESE VALUES WHEN NEEDED
-      ######################################################
-
+      # 4. Final step cleanly executes logic based on DOWNLOAD_SOURCE
       - name: Run uploader
+        if: steps.check_jobs.outputs.has_jobs == 'true'
         working-directory: uploader
-
         env:
-
           PW_TOKEN: ${{ secrets.PW_TOKEN }}
-
           GDRIVE_API_KEY: ${{ secrets.GDRIVE_API_KEY }}
-
-          #
-          # Choose source
-          #
-          # drive
-          # url
-          #
-
           DOWNLOAD_SOURCE: url
-
-          
-
         run: |
-
           if [ "$DOWNLOAD_SOURCE" = "drive" ]; then
-
             echo "Using Google Drive source..."
-
             python upload_from_gdrive.py
-
           elif [ "$DOWNLOAD_SOURCE" = "url" ]; then
-            echo "checking for jobs ..."
-            if [jobs.py]; then
-              echo "Using Direct URL source..."
-              python upload_from_url.py
-            else
-              echo "no jobs..."
-              exit 1
-
+            echo "Using Direct URL source..."
+            python upload_from_url.py
           else
-
             echo "Unknown DOWNLOAD_SOURCE: $DOWNLOAD_SOURCE"
-
             exit 1
-
           fi

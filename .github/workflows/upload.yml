@@ -70,10 +70,13 @@ jobs:
             python upload_from_gdrive.py
 
           elif [ "$DOWNLOAD_SOURCE" = "url" ]; then
-
-            echo "Using Direct URL source..."
-
-            python upload_from_url.py
+            echo "checking for jobs ..."
+            if [jobs.py]; then
+              echo "Using Direct URL source..."
+              python upload_from_url.py
+            else
+              echo "no jobs..."
+              exit 1
 
           else
 

@@ -25,27 +25,20 @@ def _filename_from_response(response, url):
 def download_hls_stream(url, download_path, headers=None):
     print(f"HLS stream detected. Downloading via FFmpeg to {download_path}...")
     
-    # 1. Start building the command
     cmd = ["ffmpeg", "-y"]
     
-    # 2. Add browser headers if they exist
     if headers:
         header_str = "".join([f"{k}: {v}\r\n" for k, v in headers.items()])
         cmd.extend(["-headers", header_str])
         
-    # 3. ADVANCED STREAM PROBING OPTIONS (Must come BEFORE '-i')
-    # This forces FFmpeg to look deeper into the stream to find audio properties
     cmd.extend([
-        "-analyzeduration", "20000000",  # Analyze up to 20 seconds of video data
-        "-probesize", "20000000",        # Look at up to 20MB of stream data
-    ])
-    
-    # 4. Add the input URL
-    cmd.extend(["-i", url])
-    
-    # 5. Output mapping and copying settings
-    cmd.extend([
-        "-c", "copy",
+        "-analyzeduration", "30000000",
+        "-probesize", "30000000",
+        "-i", url,
+        "-c:v", "copy",            # Copy video exactly (no quality loss, fast)
+        "-c:a", "aac",             # Re-encode the audio to fix the missing header data
+        "-ar", "44100",            # Force standard 44.1kHz audio sample rate fallback
+        "-ac", "2",                # Force standard 2-channel stereo audio setup
         "-bsf:a", "aac_adtstoasc",
         download_path
     ])

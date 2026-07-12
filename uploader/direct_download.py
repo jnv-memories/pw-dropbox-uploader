@@ -1,8 +1,9 @@
 import os
 import re
+import json
 import subprocess
 import tempfile
-from urllib.parse import unquote
+from urllib.parse import unquote, urlparse, parse_qs
 import requests
 from tqdm import tqdm
 
@@ -25,37 +26,56 @@ def download_hls_stream(url, download_path):
     """Downloads an HLS stream (.m3u8) using system FFmpeg."""
     print(f"HLS stream detected. Downloading via FFmpeg to {download_path}...")
     
-    # -y overwrites the file if it somehow exists
-    # -c copy copies the video/audio streams without re-encoding (very fast)
     cmd = [
         "ffmpeg",
         "-y",
         "-i", url,
         "-c", "copy",
-        "-bsf:a", "aac_adtstoasc",  # Fixes potential audio sync issues in MP4 containers
+        "-bsf:a", "aac_adtstoasc",
         download_path
     ]
     
-    # Run the command and redirect stderr/stdout to monitor errors if they happen
     process = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    
     if process.returncode != 0:
         raise RuntimeError(f"FFmpeg failed to download stream. Error:\n{process.stderr}")
 
 def download_from_url(url, filename=None, headers=None):
+    # Initialize headers dictionary if not passed
     headers = headers or {}
     
+    # Add a standard browser User-Agent to prevent basic bot blocking
+    if "User-Agent" not in headers:
+        headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
+    # --- AUTO-EXTRACT EMBEDDED HEADERS FROM THE URL ---
+    try:
+        parsed_url = urlparse(url)
+        query_params = parse_qs(parsed_url.query)
+        
+        # Check if the URL contains a 'headers' query parameter
+        if 'headers' in query_params:
+            raw_headers_str = query_params['headers'][0]
+            # Decode the JSON string embedded inside the URL parameter
+            extracted_headers = json.loads(raw_headers_str)
+            
+            if isinstance(extracted_headers, dict):
+                print("Extracted custom authentication headers from URL:")
+                for k, v in extracted_headers.items():
+                    print(f"  -> {k}: {v}")
+                    headers[k] = v  # Inject them (e.g., Origin, Referer)
+    except Exception as e:
+        print(f"Warning: Failed to parse embedded headers from URL: {e}")
+    # --------------------------------------------------
+
     # 1. Check if the URL is an HLS/m3u8 stream
     if ".m3u8" in url.lower() or "manifest" in url.lower():
         if filename is None:
-            # Strip query params to guess a decent name, default to video.mp4
             clean_url = url.split("?", 1)[0]
             base_name = os.path.basename(clean_url).replace(".m3u8", "")
             filename = f"{base_name or 'video'}.mp4"
             
         download_path = os.path.join(tempfile.gettempdir(), filename)
         
-        # Handle duplicate filenames in temp folder
         base, ext = os.path.splitext(download_path)
         counter = 1
         while os.path.exists(download_path):

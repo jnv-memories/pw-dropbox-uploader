@@ -6,28 +6,24 @@ def download_youtube_video(url):
     print(f"\n[+] YouTube URL detected. Routing to yt-dlp...")
     
     temp_dir = tempfile.gettempdir()
-    current_script_dir = os.path.dirname(os.path.abspath(__file__))
-    cookie_path = os.path.join(current_script_dir, 'youtube_cookies.txt')
-    
-    print(f"    -> Looking for cookies at: {cookie_path}")
-    if os.path.exists(cookie_path):
-        print("    -> [✔] Cookie file FOUND! Passing to yt-dlp.")
-        active_cookie_path = cookie_path
-    else:
-        print("    -> [!] Cookie file NOT FOUND! yt-dlp will try without authentication.")
-        active_cookie_path = None
+    cookie_path = os.path.join(os.getcwd(), 'youtube_cookies.txt')
     
     ydl_opts = {
+        # FIX 1: Loosen strict extension requirements. Just get the best quality available.
         'format': 'bestvideo+bestaudio/best',
+        
         'outtmpl': os.path.join(temp_dir, '%(title)s.%(ext)s'),
+        
+        # Merge separate video/audio streams into mp4 container
         'merge_output_format': 'mp4',
+        
         'quiet': False,
         'no_warnings': True,
-        'cookiefile': active_cookie_path,
+        'cookiefile': cookie_path if os.path.exists(cookie_path) else None,
+        'extractor_args': {'youtube': {'player_client': ['web']}},
         
-        # FIX: Spoof Android/iOS mobile clients instead of 'web' to bypass strict datacenter IP checks
-        'extractor_args': {'youtube': {'player_client': ['android', 'ios']}},
-        
+        # FIX 2: Force FFmpeg to convert the final file to .mp4 just in case 
+        # it downloaded a single stream that wasn't naturally an mp4.
         'postprocessors': [{
             'key': 'FFmpegVideoConvertor',
             'preferedformat': 'mp4',
@@ -37,8 +33,12 @@ def download_youtube_video(url):
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info_dict = ydl.extract_info(url, download=True)
+            
+            # Figure out what the final filename is meant to be
             raw_filename = ydl.prepare_filename(info_dict)
             base, _ = os.path.splitext(raw_filename)
+            
+            # Because of our postprocessors, the file on disk is guaranteed to be .mp4
             mp4_filename = f"{base}.mp4"
             
             if os.path.exists(mp4_filename):

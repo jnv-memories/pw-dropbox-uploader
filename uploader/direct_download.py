@@ -6,6 +6,7 @@ import tempfile
 import urllib.parse
 from urllib.parse import unquote, urlparse, parse_qs
 from curl_cffi import requests
+from youtube_download import download_youtube_video
 from tqdm import tqdm
 
 # ==========================================
@@ -86,11 +87,11 @@ def is_youtube_url(url):
 def download_from_url(url, filename=None, headers=None):
     # 1. ROUTE: YouTube Links
     if is_youtube_url(url):
-        print("\n[+] YouTube URL detected. Generating API payload and routing to custom handler...")
-        return pass
+        print("\n[+] YouTube URL detected. Routing to youtube handler...")
+        return download_youtube_video(url, filename)
 
     # Prepare standard headers for non-YouTube files
-    headers = headers or {}
+
     base_headers = {
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.9",

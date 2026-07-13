@@ -12,25 +12,17 @@ from firebase_db import (
 )
 
 def main():
-
     jobs = get_pending_jobs()
 
     if not jobs:
-
-        print()
-        print("No pending download jobs.")
-        print()
-
+        print("\nNo pending download jobs.\n")
         return
 
-    print()
-    print("=" * 70)
+    print(f"\n{'=' * 70}")
     print(f"Found {len(jobs)} pending job(s).")
-    print("=" * 70)
-    print()
+    print(f"{'=' * 70}\n")
 
     for index, job in enumerate(jobs, 1):
-
         job_id = job["jobId"]
         url = job["url"]
         folder_id = job.get("folderId")
@@ -40,67 +32,38 @@ def main():
         print(url)
         print("=" * 70)
 
-        update_download_job(
-            job_id,
-            {
-                "status": "downloading"
-            }
-        )
+        update_download_job(job_id, {"status": "downloading"})
 
         temp_path = None
 
         try:
-
+            # Passes the raw URL (YouTube, standard, or m3u8) to the updated script
             temp_path = download_from_url(url)
 
-            update_download_job(
-                job_id,
-                {
-                    "status": "uploading"
-                }
-            )
+            update_download_job(job_id, {"status": "uploading"})
 
-            upload_file(
-                temp_path,
-                folder_id
-            )
+            upload_file(temp_path, folder_id)
 
-            update_download_job(
-                job_id,
-                {
-                    "status": "completed"
-                }
-            )
+            update_download_job(job_id, {"status": "completed"})
 
         except Exception:
-
             traceback.print_exc()
-
-            update_download_job(
-                job_id,
-                {
-                    "status": "failed"
-                }
-            )
+            update_download_job(job_id, {"status": "failed"})
 
         finally:
-
             if temp_path and os.path.exists(temp_path):
-
                 os.remove(temp_path)
 
-    print()
-    print("Finished.")
-    print()
+    print("\nFinished.\n")
 
 def get_queue():
     url  = "https://queue-server-wpes.onrender.com/"
     response = requests.get(url)
     data = json.loads(response.text)
-    number = data["no_of_jobs"]
-    if number>0:
+    number = data.get("no_of_jobs", 0)
+    
+    if number > 0:
         main()
-
 
 if __name__ == "__main__":
     get_queue()

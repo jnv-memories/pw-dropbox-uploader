@@ -23,10 +23,15 @@ def download_youtube_video(url):
         'merge_output_format': 'mp4',
         'quiet': False,
         'no_warnings': True,
-        'cookiefile': active_cookie_path,
         
-        # FIX: Spoof Android/iOS mobile clients instead of 'web' to bypass strict datacenter IP checks
+        # FIX 1: Set this to None for public videos. Cookies + Datacenter IP = Ban.
+        'cookiefile': None, 
+        
+        # FIX 2: Keep the mobile clients to bypass strict web checks
         'extractor_args': {'youtube': {'player_client': ['android', 'ios']}},
+        
+        # FIX 3: Turn on verbose mode to see the raw YouTube API errors in your GH Actions log
+        'verbose': True,
         
         'postprocessors': [{
             'key': 'FFmpegVideoConvertor',

@@ -3,6 +3,7 @@ import re
 import json
 import subprocess
 import tempfile
+import urllib.parse
 from urllib.parse import unquote, urlparse, parse_qs
 from curl_cffi import requests
 from tqdm import tqdm
@@ -78,19 +79,29 @@ def download_hls_stream(url, download_path, headers=None):
         raise RuntimeError(f"FFmpeg failed to download stream. Error:\n{process.stderr}")
 
 def is_youtube_url(url):
-    return any(domain in url.lower() for domain in ['youtube.com', 'youtu.be', 'googlevideo.com'])
+    """Detects if the incoming string is a standard YouTube link."""
+    return any(domain in url.lower() for domain in ['youtube.com', 'youtu.be'])
 
 # ==========================================
 # YOUTUBE API / MERGE LOGIC
 # ==========================================
 
 def _strip_href_li(url):
+    """Strips the href.li redirect wrapper to get the raw googlevideo link."""
     if "href.li/?" in url:
         return url.split("href.li/?")[-1]
     return url
 
-def fetch_api_data(payload_body):
-    url = "https://sgm.adem.my.id/system/aee8aa08f175a1cd21b66709f5481bf4e65a8498fa81ebd263de4f72f19b40e9.php"
+def fetch_api_data(youtube_url):
+    """URL-encodes the YouTube link, attaches tokens, and fetches the JSON payload."""
+    api_endpoint = "https://sgm.adem.my.id/system/aee8aa08f175a1cd21b66709f5481bf4e65a8498fa81ebd263de4f72f19b40e9.php"
+    
+    # URL encode the user's youtube link
+    encoded_url = urllib.parse.quote(youtube_url, safe='')
+    
+    # Construct the body with the specific tokens you provided
+    payload_body = f"url={encoded_url}&token=Chrome&t1=4yj33Zlavj&t2=j4nDtNWQTf%3D%3D%3DUS&t3=rmD8byJ6wH&t4=zKSDX1cVZV"
+    
     headers = {
         "accept": "*/*",
         "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
@@ -101,7 +112,13 @@ def fetch_api_data(payload_body):
     }
 
     print("[*] Contacting PasteDownload API for links... (Waiting ~30s)")
-    response = requests.post(url, headers=headers, data=payload_body, timeout=120, impersonate="chrome120")
+    response = requests.post(
+        api_endpoint, 
+        headers=headers, 
+        data=payload_body, 
+        timeout=120, 
+        impersonate="chrome120"
+    )
     response.raise_for_status()
     return response.json()
 
@@ -138,8 +155,10 @@ def combine_with_ffmpeg(video_path, audio_path, output_path):
         raise RuntimeError(f"FFmpeg failed to combine streams. Error:\n{process.stderr}")
     print("[+] Streams successfully merged!")
 
-def process_youtube_payload(payload_body):
-    data = fetch_api_data(payload_body)
+def process_youtube_url(youtube_url):
+    """Main pipeline for processing a raw YouTube URL."""
+    data = fetch_api_data(youtube_url)
+    
     title = data.get("title", "YouTube_Video")
     safe_title = "".join([c for c in title if c.isalpha() or c.isdigit() or c==' ']).rstrip().replace(" ", "_")
     
@@ -147,12 +166,14 @@ def process_youtube_payload(payload_body):
     video_url = None
     audio_url = None
     
+    # Find M4A Audio and 1080p Video
     for link in links:
         if link.get("type") == "m4a":
             audio_url = _strip_href_li(link.get("url"))
         elif link.get("quality") == "1080P" and link.get("type") == "mp4":
             video_url = _strip_href_li(link.get("url"))
             
+    # Fallback to 720p if 1080p doesn't exist
     if not video_url:
         for link in links:
             if link.get("quality") == "720P" and link.get("type") == "mp4":
@@ -174,6 +195,7 @@ def process_youtube_payload(payload_body):
         combine_with_ffmpeg(video_temp, audio_temp, final_output)
         return final_output
     finally:
+        # Delete raw chunks to save disk space
         if os.path.exists(video_temp):
             os.remove(video_temp)
         if os.path.exists(audio_temp):
@@ -184,12 +206,12 @@ def process_youtube_payload(payload_body):
 # ==========================================
 
 def download_from_url(url, filename=None, headers=None):
-    # 1. ROUTE: YouTube API Payload (Requires Merging)
-    if url.startswith("url=") and "&token=" in url:
-        print("\n[+] YouTube API payload detected. Routing to custom handler...")
-        return process_youtube_payload(url)
+    # 1. ROUTE: YouTube Links
+    if is_youtube_url(url):
+        print("\n[+] YouTube URL detected. Generating API payload and routing to custom handler...")
+        return process_youtube_url(url)
 
-    # Prepare standard headers
+    # Prepare standard headers for non-YouTube files
     headers = headers or {}
     base_headers = {
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
@@ -208,12 +230,6 @@ def download_from_url(url, filename=None, headers=None):
                 headers[k] = v
     except Exception:
         pass
-
-    if is_youtube_url(url):
-        if not any(k.lower() == 'referer' for k in headers.keys()):
-            headers['Referer'] = 'https://www.youtube.com/'
-        if not any(k.lower() == 'origin' for k in headers.keys()):
-            headers['Origin'] = 'https://www.youtube.com'
 
     # 2. ROUTE: HLS/m3u8 Stream Downloader (Requires FFmpeg)
     if ".m3u8" in url.lower() or "manifest" in url.lower():
@@ -254,14 +270,6 @@ def download_from_url(url, filename=None, headers=None):
     if filename is None:
         filename = _filename_from_response(response, response.url)
         filename = filename.replace(".mkv", "") 
-        
-        if "videoplayback" in filename and "." not in filename:
-            parsed = urlparse(url)
-            qs = parse_qs(parsed.query)
-            if "mime" in qs and "audio" in qs["mime"][0]:
-                filename += ".m4a"
-            else:
-                filename += ".mp4"
 
         if len(filename) > 100:
             ext = os.path.splitext(filename)[1] or ".bin"

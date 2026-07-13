@@ -55,13 +55,7 @@ jobs:
           ${{ secrets.FIREBASE_JSON }}
           EOF
 
-      # NEW STEP: Create the cookies file
-      - name: Create YouTube Cookies
-        if: steps.check_jobs.outputs.has_jobs == 'true'
-        run: |
-          cat > uploader/youtube_cookies.txt << 'EOF'
-          ${{ secrets.YOUTUBE_COOKIES }}
-          EOF
+      
       # 4. Final step cleanly executes logic based on DOWNLOAD_SOURCE
       - name: Run uploader
         if: steps.check_jobs.outputs.has_jobs == 'true'

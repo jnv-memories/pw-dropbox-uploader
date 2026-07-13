@@ -7,24 +7,26 @@ def download_youtube_video(url):
     
     temp_dir = tempfile.gettempdir()
     
-    # yt-dlp configuration: Best video + best audio, merged into mp4
+    # Path to the cookies file created by GitHub Actions
+    cookie_path = os.path.join(os.getcwd(), 'youtube_cookies.txt')
+    
     ydl_opts = {
         'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
         'outtmpl': os.path.join(temp_dir, '%(title)s.%(ext)s'),
         'merge_output_format': 'mp4',
         'quiet': False,
         'no_warnings': True,
+        # ADD THIS: Pass the cookie file to bypass bot checks
+        'cookiefile': cookie_path if os.path.exists(cookie_path) else None,
+        # ADD THIS: Spoof the client to look more like a standard web user
+        'extractor_args': {'youtube': {'player_client': ['web']}}
     }
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # Extract info and download
             info_dict = ydl.extract_info(url, download=True)
-            
-            # Prepare the expected filename
             filename = ydl.prepare_filename(info_dict)
             
-            # Since we enforce mp4 merging, check if the output file is an .mp4
             base, _ = os.path.splitext(filename)
             mp4_filename = f"{base}.mp4"
             

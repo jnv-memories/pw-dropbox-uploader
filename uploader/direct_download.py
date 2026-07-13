@@ -4,8 +4,9 @@ import json
 import subprocess
 import tempfile
 from urllib.parse import unquote, urlparse, parse_qs
-from curl_cffi import requests  # Swapped standard requests for curl_cffi to bypass TLS blocks
+from curl_cffi import requests
 from tqdm import tqdm
+from yt_downloader import download_youtube_video  # Import the new YouTube logic
 
 def _filename_from_response(response, url):
     cd = response.headers.get("content-disposition", "")
@@ -23,7 +24,7 @@ def _filename_from_response(response, url):
     return name or "download.bin"
 
 def download_hls_stream(url, download_path, headers=None):
-    print(f"HLS stream detected. Downloading via FFmpeg to {download_path}...")
+    print(f"\n[+] HLS stream detected. Downloading via FFmpeg to {download_path}...")
     
     cmd = ["ffmpeg", "-y"]
     
@@ -35,10 +36,10 @@ def download_hls_stream(url, download_path, headers=None):
         "-analyzeduration", "30000000",
         "-probesize", "30000000",
         "-i", url,
-        "-c:v", "copy",            # Copy video exactly (no quality loss, fast)
-        "-c:a", "aac",             # Re-encode the audio to fix missing header details
-        "-ar", "44100",            # Force standard 44.1kHz audio sample rate fallback
-        "-ac", "2",                # Force standard 2-channel stereo audio setup
+        "-c:v", "copy",
+        "-c:a", "aac",
+        "-ar", "44100",
+        "-ac", "2",
         "-bsf:a", "aac_adtstoasc",
         download_path
     ])
@@ -78,10 +79,18 @@ def extract_nested_headers(url_string):
             
     return {}
 
+def is_youtube_url(url):
+    """Helper function to detect YouTube domains."""
+    return any(domain in url.lower() for domain in ['youtube.com', 'youtu.be'])
+
 def download_from_url(url, filename=None, headers=None):
-    headers = headers or {}
     
-    # Synchronized headers to avoid detection (Matching Chrome 120 profile)
+    # 1. ROUTE: YouTube Downloader
+    if is_youtube_url(url):
+        return download_youtube_video(url)
+
+    # Prepare standard headers for normal downloads & HLS
+    headers = headers or {}
     browser_headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
@@ -102,25 +111,23 @@ def download_from_url(url, filename=None, headers=None):
     try:
         extracted = extract_nested_headers(url)
         if extracted:
-            print("\n[✔] Extracted authentication headers from URL parameters:")
+            print("\n[✔] Extracted authentication headers from URL parameters.")
             for k, v in extracted.items():
-                print(f"    -> {k}: {v}")
                 headers[k] = v
     except Exception as e:
-        print(f"\n[!] Warning: Nested header extraction failed: {e}")
+        pass
 
-    # 1. Check if the URL is an HLS/m3u8 stream
+    # 2. ROUTE: HLS/m3u8 Stream Downloader (Requires FFmpeg)
     if ".m3u8" in url.lower() or "manifest" in url.lower():
         if filename is None:
             clean_url = url.split("?", 1)[0]
             base_name = os.path.basename(clean_url)
-            # FORCE REMOVAL OF BOTH .m3u8 AND .mkv SUFFIXES TO AVOID REDUNDANT EXTENSIONS
             base_name = base_name.replace(".m3u8", "").replace(".mkv", "")
             filename = f"{base_name or 'video'}.mp4"
             
         download_path = os.path.join(tempfile.gettempdir(), filename)
         
-        # Ensure the filename ends in .mp4 even if passed explicitly as an argument
+        # Enforce .mp4 for HLS streams explicitly
         if not download_path.lower().endswith('.mp4'):
             base, _ = os.path.splitext(download_path)
             download_path = f"{base}.mp4"
@@ -134,7 +141,8 @@ def download_from_url(url, filename=None, headers=None):
         download_hls_stream(url, download_path, headers)
         return download_path
 
-    print(f"\nSending request to stream proxy URL: {url}")
+    # 3. ROUTE: Standard File Download (No FFmpeg Required)
+    print(f"\n[+] Standard file detected. Sending request to URL...")
     
     response = requests.get(
         url,
@@ -148,11 +156,14 @@ def download_from_url(url, filename=None, headers=None):
     
     if filename is None:
         filename = _filename_from_response(response, response.url)
-        filename = filename.replace(".mkv", "") # Strip .mkv out if found in header names
-        if len(filename) > 100 or "video" in filename.lower():
-            filename = "streamed_video"
-        if not filename.lower().endswith(".mp4"):
-            filename = f"{filename}.mp4"
+        filename = filename.replace(".mkv", "") 
+        if len(filename) > 100:
+            # Fallback for extremely long generic names
+            ext = os.path.splitext(filename)[1] or ".bin"
+            filename = f"downloaded_file{ext}"
+        
+        # [FIX]: Removed the logic forcing `.mp4` onto standard files here. 
+        # Standard files (like .js, .pdf, .zip) will now retain their original extension.
         
     download_path = os.path.join(tempfile.gettempdir(), filename)
     base, ext = os.path.splitext(download_path)

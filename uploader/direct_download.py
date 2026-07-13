@@ -94,21 +94,24 @@ def _strip_href_li(url):
 
 def fetch_api_data(youtube_url):
     """URL-encodes the YouTube link, attaches tokens, and fetches the JSON payload."""
-    api_endpoint = "https://biz.adem.my.id/system/aee8aa08f175a1cd21b66709f5481bf4e65a8498fa81ebd263de4f72f19b40e9.php"
+    api_endpoint = "https://sgm.adem.my.id/system/aee8aa08f175a1cd21b66709f5481bf4e65a8498fa81ebd263de4f72f19b40e9.php"
     
     # URL encode the user's youtube link
     encoded_url = urllib.parse.quote(youtube_url, safe='')
     
-    # Construct the body with the specific tokens you provided
+    # Construct the body. 
+    # NOTE: If the script fails to decode JSON, these tokens have likely expired!
     payload_body = f"url={encoded_url}&token=Chrome&t1=2ccDYI5FFB&t2=FUziFonRA2%3D%3D%3DIN&t3=ZET21qHO3X&t4=cc0Te75Kuv"
     
     headers = {
-        "accept": "*/*",
+        "accept": "application/json, text/javascript, */*; q=0.01",
         "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
         "sec-ch-ua": '"Not;A=Brand";v="8", "Chromium";v="150", "Google Chrome";v="150"',
         "sec-ch-ua-mobile": "?1",
         "sec-ch-ua-platform": '"Android"',
-        "Referer": "https://pastedownload.com/"
+        "Referer": "https://pastedownload.com/",
+        # Explicitly ask for gzip/deflate to prevent '0x90' Brotli decode errors
+        "Accept-Encoding": "gzip, deflate" 
     }
 
     print("[*] Contacting PasteDownload API for links... (Waiting ~30s)")
@@ -120,8 +123,15 @@ def fetch_api_data(youtube_url):
         impersonate="chrome120"
     )
     response.raise_for_status()
-    return response.json()
-
+    
+    # Catch binary responses gracefully
+    try:
+        return response.json()
+    except Exception as e:
+        print("\n[!] FATAL ERROR: The API did not return valid JSON.")
+        print("[!] This usually happens because the t1/t2/t3 tokens in the payload have EXPIRED.")
+        print(f"[!] Raw server response snippet: {response.content[:75]}")
+        raise ValueError("Failed to decode JSON from API. You may need to fetch fresh tokens from the website.")
 def download_youtube_stream(url, filepath, desc="Downloading"):
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",

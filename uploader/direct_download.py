@@ -6,7 +6,6 @@ import tempfile
 from urllib.parse import unquote, urlparse, parse_qs
 from curl_cffi import requests
 from tqdm import tqdm
-from yt_downloader import download_youtube_video  # Import the new YouTube logic
 
 def _filename_from_response(response, url):
     cd = response.headers.get("content-disposition", "")
@@ -84,10 +83,6 @@ def is_youtube_url(url):
     return any(domain in url.lower() for domain in ['youtube.com', 'youtu.be'])
 
 def download_from_url(url, filename=None, headers=None):
-    
-    # 1. ROUTE: YouTube Downloader
-    if is_youtube_url(url):
-        return download_youtube_video(url)
 
     # Prepare standard headers for normal downloads & HLS
     headers = headers or {}

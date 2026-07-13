@@ -6,12 +6,9 @@ def download_youtube_video(url):
     print(f"\n[+] YouTube URL detected. Routing to yt-dlp...")
     
     temp_dir = tempfile.gettempdir()
-    
-    # BULLETPROOF PATH: Get the exact directory this python file is inside (/uploader/)
     current_script_dir = os.path.dirname(os.path.abspath(__file__))
     cookie_path = os.path.join(current_script_dir, 'youtube_cookies.txt')
     
-    # Debugging: Print exactly what is happening so we can see it in GitHub Actions logs
     print(f"    -> Looking for cookies at: {cookie_path}")
     if os.path.exists(cookie_path):
         print("    -> [✔] Cookie file FOUND! Passing to yt-dlp.")
@@ -27,7 +24,10 @@ def download_youtube_video(url):
         'quiet': False,
         'no_warnings': True,
         'cookiefile': active_cookie_path,
-        'extractor_args': {'youtube': {'player_client': ['web']}},
+        
+        # FIX: Spoof Android/iOS mobile clients instead of 'web' to bypass strict datacenter IP checks
+        'extractor_args': {'youtube': {'player_client': ['android', 'ios']}},
+        
         'postprocessors': [{
             'key': 'FFmpegVideoConvertor',
             'preferedformat': 'mp4',

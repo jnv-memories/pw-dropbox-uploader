@@ -7,7 +7,7 @@ from pytubefix.cli import on_progress
 
 def download_youtube_video(url, filename=None):
     try:
-        yt = YouTube(url, on_progress_callback=on_progress)
+        yt = YouTube(url, 'WEB', on_progress_callback=on_progress)
         print(f"\n[+] Downloading YouTube video: {yt.title}")
 
         video_stream = yt.streams.get_highest_resolution(False)

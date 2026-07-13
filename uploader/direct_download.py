@@ -94,13 +94,13 @@ def _strip_href_li(url):
 
 def fetch_api_data(youtube_url):
     """URL-encodes the YouTube link, attaches tokens, and fetches the JSON payload."""
-    api_endpoint = "https://sgm.adem.my.id/system/aee8aa08f175a1cd21b66709f5481bf4e65a8498fa81ebd263de4f72f19b40e9.php"
+    api_endpoint = "https://biz.adem.my.id/system/aee8aa08f175a1cd21b66709f5481bf4e65a8498fa81ebd263de4f72f19b40e9.php"
     
     # URL encode the user's youtube link
     encoded_url = urllib.parse.quote(youtube_url, safe='')
     
     # Construct the body with the specific tokens you provided
-    payload_body = f"url={encoded_url}&token=Chrome&t1=4yj33Zlavj&t2=j4nDtNWQTf%3D%3D%3DUS&t3=rmD8byJ6wH&t4=zKSDX1cVZV"
+    payload_body = f"url={encoded_url}&token=Chrome&t1=2ccDYI5FFB&t2=FUziFonRA2%3D%3D%3DIN&t3=ZET21qHO3X&t4=cc0Te75Kuv"
     
     headers = {
         "accept": "*/*",

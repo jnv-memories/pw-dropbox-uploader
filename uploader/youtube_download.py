@@ -5,23 +5,21 @@ import yt_dlp
 def download_youtube_video(url, filename=None):
     temp_dir = tempfile.gettempdir()
     
-    # If a filename is provided, force yt-dlp to use it
     if filename:
-        # Ensure we don't accidentally append double extensions
         base, _ = os.path.splitext(filename)
         outtmpl = os.path.join(temp_dir, f"{base}.%(ext)s")
     else:
-        # Otherwise, let yt-dlp name it based on the video title
         outtmpl = os.path.join(temp_dir, '%(title)s.%(ext)s')
 
-    # Applying the same logic from your working GitHub Action:
-    # 1. Route through the local Cloudflare WARP SOCKS5 proxy
-    # 2. Spoof Android/iOS clients to bypass bot blocks
-    # 3. Merge best video and audio into an mp4 container
+    # UPDATED LOGIC:
+    # 'bestvideo+bestaudio/best' removes the extension restriction, 
+    # forcing it to grab the absolute highest quality 1080p/4k/8k video stream 
+    # and the highest quality audio stream, regardless of their source format.
+    # 'merge_output_format': 'mp4' uses FFmpeg to stitch them into an MP4 container.
     ydl_opts = {
         'proxy': 'socks5://127.0.0.1:40000',
         'extractor_args': {'youtube': {'player_client': ['ios', 'android']}},
-        'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+        'format': 'bestvideo+bestaudio/best',
         'merge_output_format': 'mp4',
         'outtmpl': outtmpl,
         'quiet': False,
@@ -29,25 +27,24 @@ def download_youtube_video(url, filename=None):
     }
     
     try:
-        print(f"\n[+] Downloading YouTube video via yt-dlp: {url}")
+        print(f"\n[+] Downloading TRUE highest quality YouTube video via yt-dlp: {url}")
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             # Extract info and download
             info_dict = ydl.extract_info(url, download=True)
             
-            # yt-dlp returns the path it downloaded to
+            # Get the path where yt-dlp originally downloaded the files
             downloaded_file_path = ydl.prepare_filename(info_dict)
             
-            # Because of the merge_output_format='mp4', the final file might 
-            # have its extension changed from the prepare_filename prediction.
-            # Let's verify the actual final path.
+            # Because we force FFmpeg to merge into an MP4, the final file 
+            # will definitely end in .mp4, so we update the path string to match.
             base_path, _ = os.path.splitext(downloaded_file_path)
             mp4_path = f"{base_path}.mp4"
             
             if not os.path.exists(downloaded_file_path) and os.path.exists(mp4_path):
                 downloaded_file_path = mp4_path
                 
-            print(f"[✔] Download and merge completed: {downloaded_file_path}")
+            print(f"[✔] Download and FFmpeg merge completed: {downloaded_file_path}")
             return downloaded_file_path
 
     except Exception as e:

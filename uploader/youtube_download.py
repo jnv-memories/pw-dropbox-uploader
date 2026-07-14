@@ -12,12 +12,11 @@ def download_youtube_video(url, filename=None):
         outtmpl = os.path.join(temp_dir, '%(title)s.%(ext)s')
 
     # UPDATED LOGIC:
-    # 1. Removed all forced player_clients (tv, web, ios). 
-    #    The master branch of yt-dlp will now auto-negotiate to avoid DRM/PO blocks.
-    # 2. Maintained the local WARP proxy to bypass GitHub datacenter IP bans.
-    # 3. Requesting bestvideo + bestaudio and merging via system FFmpeg.
+    # We are now passing the cookiefile we generated in GitHub Actions.
+    # This acts as a VIP pass, completely skipping the bot check and DRM blocks.
     ydl_opts = {
         'proxy': 'socks5://127.0.0.1:40000',
+        'cookiefile': 'youtube_cookies.txt',
         'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best',
         'merge_output_format': 'mp4',
         'outtmpl': outtmpl,
@@ -26,7 +25,7 @@ def download_youtube_video(url, filename=None):
     }
     
     try:
-        print(f"\n[+] Downloading TRUE highest quality YouTube video via yt-dlp: {url}")
+        print(f"\n[+] Downloading TRUE highest quality YouTube video using Authenticated Cookies: {url}")
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info_dict = ydl.extract_info(url, download=True)
@@ -35,7 +34,6 @@ def download_youtube_video(url, filename=None):
             base_path, _ = os.path.splitext(downloaded_file_path)
             mp4_path = f"{base_path}.mp4"
             
-            # Ensure we return the path to the merged .mp4 file
             if not os.path.exists(downloaded_file_path) and os.path.exists(mp4_path):
                 downloaded_file_path = mp4_path
                 

@@ -17,12 +17,6 @@ jobs:
         with:
           python-version: "3.11"
 
-      # NEW FIX: Install Deno (The only JS runtime yt-dlp trusts by default now)
-      - name: Setup Deno
-        uses: denoland/setup-deno@v1
-        with:
-          deno-version: v1.x
-
       - name: Install requests
         run: pip install requests
 
@@ -51,14 +45,24 @@ jobs:
           warp-cli --accept-tos connect
           sleep 5 
 
-      # Removed nodejs from apt-get since we are using Deno now
-      - name: Install FFmpeg
+      # NEW: Install FFmpeg and Node.js globally using the system package manager
+      - name: Install System Dependencies
         if: steps.check_jobs.outputs.has_jobs == 'true'
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg
+          sudo apt-get install -y ffmpeg nodejs
 
-      - name: Install dependencies
+      # NEW: The Sanity Check Flag. Stops the workflow if tools aren't communicating.
+      - name: Environment Sanity Check
+        if: steps.check_jobs.outputs.has_jobs == 'true'
+        run: |
+          echo "Verifying FFmpeg..."
+          ffmpeg -version || (echo "ERROR: FFmpeg is not accessible!" && exit 1)
+          echo "Verifying Node.js (JavaScript Runtime for yt-dlp)..."
+          node -v || (echo "ERROR: Node.js is not accessible!" && exit 1)
+          echo "All dependencies successfully verified and talking to each other!"
+
+      - name: Install Python dependencies
         if: steps.check_jobs.outputs.has_jobs == 'true'
         run: |
           python -m pip install --upgrade pip

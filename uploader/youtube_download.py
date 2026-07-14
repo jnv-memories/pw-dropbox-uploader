@@ -1,70 +1,54 @@
 import os
-import subprocess
 import tempfile
-import uuid
-from pytubefix import YouTube
-from pytubefix.cli import on_progress
+import yt_dlp
 
 def download_youtube_video(url, filename=None):
+    temp_dir = tempfile.gettempdir()
+    
+    # If a filename is provided, force yt-dlp to use it
+    if filename:
+        # Ensure we don't accidentally append double extensions
+        base, _ = os.path.splitext(filename)
+        outtmpl = os.path.join(temp_dir, f"{base}.%(ext)s")
+    else:
+        # Otherwise, let yt-dlp name it based on the video title
+        outtmpl = os.path.join(temp_dir, '%(title)s.%(ext)s')
+
+    # Applying the same logic from your working GitHub Action:
+    # 1. Route through the local Cloudflare WARP SOCKS5 proxy
+    # 2. Spoof Android/iOS clients to bypass bot blocks
+    # 3. Merge best video and audio into an mp4 container
+    ydl_opts = {
+        'proxy': 'socks5://127.0.0.1:40000',
+        'extractor_args': {'youtube': {'player_client': ['ios', 'android']}},
+        'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+        'merge_output_format': 'mp4',
+        'outtmpl': outtmpl,
+        'quiet': False,
+        'no_warnings': False,
+    }
+    
     try:
-        yt = YouTube(url, 'WEB', on_progress_callback=on_progress)
-        print(f"\n[+] Downloading YouTube video: {yt.title}")
-
-        video_stream = yt.streams.get_highest_resolution(False)
-        print(f"Selected video stream: {video_stream.resolution} ({video_stream.fps}fps)")
-
-        temp_dir = tempfile.gettempdir()
+        print(f"\n[+] Downloading YouTube video via yt-dlp: {url}")
         
-        # Sanitize title for filename if none is provided
-        if not filename:
-            safe_title = "".join(c for c in yt.title if c.isalnum() or c in " ._-").rstrip()
-            filename = f"{safe_title}.mp4"
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            # Extract info and download
+            info_dict = ydl.extract_info(url, download=True)
             
-        output_path = os.path.join(temp_dir, filename)
-
-        # Ensure unique filename if it already exists
-        base, ext = os.path.splitext(output_path)
-        counter = 1
-        while os.path.exists(output_path):
-            output_path = f"{base} ({counter}){ext}"
-            counter += 1
-
-        if not video_stream.is_progressive:
-            audio_stream = yt.streams.filter(only_audio=True).order_by('abr').desc().first()
-            if not audio_stream:
-                raise Exception('No suitable audio stream found.')
-
-            print(f"Selected audio stream: {audio_stream.abr}")
-
-            # Use UUIDs to prevent file collisions if multiple jobs run
-            uid = uuid.uuid4().hex
-            video_temp_name = f"temp_video_{uid}.mp4"
-            audio_temp_name = f"temp_audio_{uid}.mp4"
-
-            video_path = video_stream.download(output_path=temp_dir, filename=video_temp_name)
-            audio_path = audio_stream.download(output_path=temp_dir, filename=audio_temp_name)
-
-            print("Combining video and audio streams with ffmpeg...")
-            subprocess.run([
-                'ffmpeg', '-y',
-                '-i', video_path,
-                '-i', audio_path,
-                '-c:v', 'copy',
-                '-c:a', 'aac',
-                '-strict', 'experimental',
-                output_path
-            ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-            # Clean up temporary streams
-            os.remove(video_path)
-            os.remove(audio_path)
+            # yt-dlp returns the path it downloaded to
+            downloaded_file_path = ydl.prepare_filename(info_dict)
             
-            print(f"[✔] Download and merge completed: {output_path}")
-        else:
-            video_stream.download(output_path=temp_dir, filename=os.path.basename(output_path))
-            print(f"[✔] Download completed: {output_path}")
+            # Because of the merge_output_format='mp4', the final file might 
+            # have its extension changed from the prepare_filename prediction.
+            # Let's verify the actual final path.
+            base_path, _ = os.path.splitext(downloaded_file_path)
+            mp4_path = f"{base_path}.mp4"
             
-        return output_path
+            if not os.path.exists(downloaded_file_path) and os.path.exists(mp4_path):
+                downloaded_file_path = mp4_path
+                
+            print(f"[✔] Download and merge completed: {downloaded_file_path}")
+            return downloaded_file_path
 
     except Exception as e:
         print(f"[-] An error occurred during YouTube download: {e}")

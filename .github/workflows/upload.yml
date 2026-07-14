@@ -17,12 +17,6 @@ jobs:
         with:
           python-version: "3.11"
 
-      # NEW FIX: Install Node.js so yt-dlp can solve YouTube's JavaScript "n-challenges"
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
       # 1. Install ONLY the requirement needed to check jobs
       - name: Install requests
         run: pip install requests
@@ -41,7 +35,7 @@ jobs:
             echo "has_jobs=false" >> $GITHUB_OUTPUT
           fi
 
-      # 3. NEW FIX: Install and start Cloudflare WARP Proxy
+      # 3. Setup Cloudflare WARP Proxy
       - name: Setup Cloudflare WARP Proxy
         if: steps.check_jobs.outputs.has_jobs == 'true'
         run: |
@@ -52,16 +46,16 @@ jobs:
           warp-cli --accept-tos registration new
           warp-cli --accept-tos mode proxy
           warp-cli --accept-tos connect
-          sleep 5 # Give the proxy a few seconds to connect
+          sleep 5 
 
-      # 4. Install FFmpeg
-      - name: Install FFmpeg
+      # 4. NEW FIX: Install FFmpeg AND System-level Node.js (Guarantees yt-dlp can solve JS challenges)
+      - name: Install System Packages
         if: steps.check_jobs.outputs.has_jobs == 'true'
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg
+          sudo apt-get install -y ffmpeg nodejs
 
-      # 5. Install dependencies (Using MASTER branch to bypass SABR/PO Token blocks)
+      # 5. Install dependencies (Using MASTER branch)
       - name: Install dependencies
         if: steps.check_jobs.outputs.has_jobs == 'true'
         run: |

@@ -17,9 +17,11 @@ jobs:
         with:
           python-version: "3.11"
 
+      # 1. Install ONLY the requirement needed to check jobs
       - name: Install requests
         run: pip install requests
 
+      # 2. Check for jobs BEFORE heavy installations
       - name: Check for jobs
         id: check_jobs
         working-directory: uploader
@@ -33,6 +35,7 @@ jobs:
             echo "has_jobs=false" >> $GITHUB_OUTPUT
           fi
 
+      # 3. NEW FIX: Install and start Cloudflare WARP Proxy
       - name: Setup Cloudflare WARP Proxy
         if: steps.check_jobs.outputs.has_jobs == 'true'
         run: |
@@ -43,43 +46,31 @@ jobs:
           warp-cli --accept-tos registration new
           warp-cli --accept-tos mode proxy
           warp-cli --accept-tos connect
-          sleep 5 
+          sleep 5 # Give the proxy a few seconds to connect
 
-      # NEW: Install FFmpeg and Node.js globally using the system package manager
-      - name: Install System Dependencies
+      # 4. Install FFmpeg
+      - name: Install FFmpeg
         if: steps.check_jobs.outputs.has_jobs == 'true'
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg nodejs
+          sudo apt-get install -y ffmpeg
 
-      # NEW: The Sanity Check Flag. Stops the workflow if tools aren't communicating.
-      - name: Environment Sanity Check
-        if: steps.check_jobs.outputs.has_jobs == 'true'
-        run: |
-          echo "Verifying FFmpeg..."
-          ffmpeg -version || (echo "ERROR: FFmpeg is not accessible!" && exit 1)
-          echo "Verifying Node.js (JavaScript Runtime for yt-dlp)..."
-          node -v || (echo "ERROR: Node.js is not accessible!" && exit 1)
-          echo "All dependencies successfully verified and talking to each other!"
-
-      - name: Install Python dependencies
+      # 5. Install dependencies (Added yt-dlp explicitly)
+      - name: Install dependencies
         if: steps.check_jobs.outputs.has_jobs == 'true'
         run: |
           python -m pip install --upgrade pip
           pip install -r uploader/requirements.txt
-          pip install -U git+https://github.com/yt-dlp/yt-dlp.git@master
+          pip install -U yt-dlp
 
-      - name: Create Secrets Files
+      - name: Create Firebase Credentials
         if: steps.check_jobs.outputs.has_jobs == 'true'
         run: |
           cat > uploader/firebase.json << 'EOF'
           ${{ secrets.FIREBASE_JSON }}
           EOF
-          
-          cat > uploader/youtube_cookies.txt << 'EOF'
-          ${{ secrets.YOUTUBE_COOKIES }}
-          EOF
       
+      # 6. Final step cleanly executes logic
       - name: Run uploader
         if: steps.check_jobs.outputs.has_jobs == 'true'
         working-directory: uploader

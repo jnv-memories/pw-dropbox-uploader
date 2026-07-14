@@ -12,10 +12,12 @@ def download_youtube_video(url, filename=None):
         outtmpl = os.path.join(temp_dir, '%(title)s.%(ext)s')
 
     # UPDATED LOGIC:
-    # Changed player_client to 'web' and 'mweb' to avoid the 'tv' DRM experiment.
+    # 1. Removed all forced player_clients (tv, web, ios). 
+    #    The master branch of yt-dlp will now auto-negotiate to avoid DRM/PO blocks.
+    # 2. Maintained the local WARP proxy to bypass GitHub datacenter IP bans.
+    # 3. Requesting bestvideo + bestaudio and merging via system FFmpeg.
     ydl_opts = {
         'proxy': 'socks5://127.0.0.1:40000',
-        'extractor_args': {'youtube': {'player_client': ['web', 'mweb']}},
         'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best',
         'merge_output_format': 'mp4',
         'outtmpl': outtmpl,
@@ -33,6 +35,7 @@ def download_youtube_video(url, filename=None):
             base_path, _ = os.path.splitext(downloaded_file_path)
             mp4_path = f"{base_path}.mp4"
             
+            # Ensure we return the path to the merged .mp4 file
             if not os.path.exists(downloaded_file_path) and os.path.exists(mp4_path):
                 downloaded_file_path = mp4_path
                 

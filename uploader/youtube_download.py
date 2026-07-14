@@ -11,13 +11,10 @@ def download_youtube_video(url, filename=None):
     else:
         outtmpl = os.path.join(temp_dir, '%(title)s.%(ext)s')
 
-    # UPDATED LOGIC:
-    # 1. We restore 'ios' and 'android' clients (Mirrors your working CLI project)
-    #    This completely BYPASSES the web JavaScript math puzzles (no Deno/Node needed).
-    # 2. We keep the format exactly as you had it in your working project for web compatibility.
+    # We removed the player_client restriction. yt-dlp will now use the 
+    # default web clients so that it can successfully pass the cookies.
     ydl_opts = {
         'proxy': 'socks5://127.0.0.1:40000',
-        'extractor_args': {'youtube': {'player_client': ['ios', 'android']}},
         'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
         'merge_output_format': 'mp4',
         'outtmpl': outtmpl,
@@ -25,14 +22,14 @@ def download_youtube_video(url, filename=None):
         'no_warnings': False,
     }
     
-    # Attach cookies dynamically if the GitHub workflow created the file
+    # Attach the cookies from the workflow
     if os.path.exists("youtube_cookies.txt"):
         ydl_opts['cookiefile'] = "youtube_cookies.txt"
     elif os.path.exists("uploader/youtube_cookies.txt"):
         ydl_opts['cookiefile'] = "uploader/youtube_cookies.txt"
         
     try:
-        print(f"\n[+] Downloading YouTube video using Authenticated Cookies & Mobile Clients: {url}")
+        print(f"\n[+] Downloading YouTube video using Authenticated Cookies & JS Runtime: {url}")
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info_dict = ydl.extract_info(url, download=True)

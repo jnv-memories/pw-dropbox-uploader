@@ -17,6 +17,12 @@ jobs:
         with:
           python-version: "3.11"
 
+      # NEW FIX: Install Node.js so yt-dlp can solve YouTube's JavaScript "n-challenges"
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
       # 1. Install ONLY the requirement needed to check jobs
       - name: Install requests
         run: pip install requests

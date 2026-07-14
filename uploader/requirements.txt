@@ -4,4 +4,3 @@ requests
 requests-toolbelt
 tqdm
 curl-cffi>=0.6.2
-pytubefix

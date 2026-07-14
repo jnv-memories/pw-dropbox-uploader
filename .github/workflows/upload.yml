@@ -17,11 +17,15 @@ jobs:
         with:
           python-version: "3.11"
 
-      # 1. Install ONLY the requirement needed to check jobs
+      # Restored proper Node.js setup for reliable JS runtime detection
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
       - name: Install requests
         run: pip install requests
 
-      # 2. Check for jobs BEFORE heavy installations
       - name: Check for jobs
         id: check_jobs
         working-directory: uploader
@@ -35,7 +39,6 @@ jobs:
             echo "has_jobs=false" >> $GITHUB_OUTPUT
           fi
 
-      # 3. Setup Cloudflare WARP Proxy
       - name: Setup Cloudflare WARP Proxy
         if: steps.check_jobs.outputs.has_jobs == 'true'
         run: |
@@ -48,14 +51,12 @@ jobs:
           warp-cli --accept-tos connect
           sleep 5 
 
-      # 4. NEW FIX: Install FFmpeg AND System-level Node.js (Guarantees yt-dlp can solve JS challenges)
-      - name: Install System Packages
+      - name: Install FFmpeg
         if: steps.check_jobs.outputs.has_jobs == 'true'
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg nodejs
+          sudo apt-get install -y ffmpeg
 
-      # 5. Install dependencies (Using MASTER branch)
       - name: Install dependencies
         if: steps.check_jobs.outputs.has_jobs == 'true'
         run: |
@@ -63,14 +64,18 @@ jobs:
           pip install -r uploader/requirements.txt
           pip install -U git+https://github.com/yt-dlp/yt-dlp.git@master
 
-      - name: Create Firebase Credentials
+      # NEW: Write the YouTube Cookies secret to a physical file
+      - name: Create Secrets Files
         if: steps.check_jobs.outputs.has_jobs == 'true'
         run: |
           cat > uploader/firebase.json << 'EOF'
           ${{ secrets.FIREBASE_JSON }}
           EOF
+          
+          cat > uploader/youtube_cookies.txt << 'EOF'
+          ${{ secrets.YOUTUBE_COOKIES }}
+          EOF
       
-      # 6. Final step cleanly executes logic
       - name: Run uploader
         if: steps.check_jobs.outputs.has_jobs == 'true'
         working-directory: uploader

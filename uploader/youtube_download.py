@@ -12,11 +12,10 @@ def download_youtube_video(url, filename=None):
         outtmpl = os.path.join(temp_dir, '%(title)s.%(ext)s')
 
     # UPDATED LOGIC:
-    # 1. Switched player_client to 'tv' and 'web' to bypass the new iOS PO Token and Android SABR blocks.
-    # 2. Forcing download of best video and best audio, then merging to MP4.
+    # Changed player_client to 'web' and 'mweb' to avoid the 'tv' DRM experiment.
     ydl_opts = {
         'proxy': 'socks5://127.0.0.1:40000',
-        'extractor_args': {'youtube': {'player_client': ['tv', 'web']}},
+        'extractor_args': {'youtube': {'player_client': ['web', 'mweb']}},
         'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best',
         'merge_output_format': 'mp4',
         'outtmpl': outtmpl,

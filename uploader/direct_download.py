@@ -85,6 +85,8 @@ def is_youtube_url(url):
 
 
 def download_from_url(url, filename=None, headers=None):
+    if headers is None:
+        headers = {}
     # 1. ROUTE: YouTube Links
     if is_youtube_url(url):
         print("\n[+] YouTube URL detected. Routing to youtube handler...")
